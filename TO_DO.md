@@ -1,6 +1,5 @@
 **Bugs**
-1. The FILTER_LABEL starts in part on the fixed bar that shows when casting should refer to the next filter that triggers, wether it is a D filter of U filter
-2. The next phase button in the fixed bar is not triggering the next phase advance, only the red one does that
+1. The next phase button in the fixed bar is not triggering the next phase advance, only the red one does that. Let's remove that and put the red button just above the plot. The fidex bar should remain as it is
 
 **Fixed**
 1. after the start, I noticed that the recovered mark on the predicted path plot is before the end of the U-1 filter (with default values) — propagation loop now only chains T2 stops from bottom-leave; Recovered event updated accordingly
@@ -10,8 +9,11 @@
 4. Add settable time for the deploy to surface phase
 5. start cast tracker: T2 preset default value doesn't match the suggested one
 6. When it's filtering, there is the indicator that shows that I'm late of X minutes, with X increasing as we filter, but since we are in the filtering phase, if the expected phase in that moment is the same filtering phase we shouldn't be more late than when we started 
+7. The FILTER_LABEL starts in part on the fixed bar that shows when casting should refer to the next filter that triggers, wether it is a D filter of U filter
 
 **To add**
+- The description of the platform on the README.md is wrong.
+We are building a tool that allows the user to determine the preset needed for some instruments (such as SoloPuffer) that trigger when some conditions are met. At the moment we are taking care of time delayed triggers, considering filtering time, actuation and homing time, casting delays and safety margins.
 
 **Added**
 1. advanced settings: homing time (default 30 s) that adds up to the filtering time
@@ -30,6 +32,7 @@
 -
 
 **Aesthetic**
+- Change the title on Chronocaster
 
 **Aesthetic done**
 1. Move the start bottom inside and on the right side of the current phase blue panel and make it smaller — pre-cast uses [4,1] columns; active cast next-phase button is in a [4,1] column beside the banner

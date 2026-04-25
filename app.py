@@ -282,7 +282,7 @@ def _build_phases(live_stops, bottom_arrive_s, bottom_leave_s, recovered_evt,
     _prev_depart = float(deploy_delay_s)  # descent starts after deploy delay
     _prev_depth  = 0.0
 
-    ph.append({"label": "🚀 Deploy delay",
+    ph.append({"label": "🚀 Deployment phase",
                "time_s": 0.0, "depth_m": 0.0, "from_depth_m": 0.0})
 
     for _fs in _t1:
@@ -489,7 +489,24 @@ else:
 
     _next_label = _phases_early[_pidx_early + 1]["label"] if not _is_last_phase else ""
 
-    _bc1, _bc2, _bc3, _bc4 = st.columns([1, 1, 1, 2])
+    def _advance_current_phase() -> None:
+        _elapsed_now = _time.time() - (st.session_state.cast_t0_wall or _time.time())
+        _live_t2_now = list(st.session_state.live_t2_depths)
+        _planned_depth = _cur_phase_early["depth_m"]
+        for _ti, _td in enumerate(t2_depths):
+            if abs(_planned_depth - _td) < 0.5 and _ti < len(_live_t2_now):
+                _planned_depth = _live_t2_now[_ti]
+                break
+        st.session_state.cast_actual_trace.append(
+            (_elapsed_now, _planned_depth, _cur_phase_early["label"])
+        )
+        if not _is_last_phase:
+            st.session_state.cast_phase_idx += 1
+            st.session_state.cast_phase_start_wall = _time.time()
+        else:
+            st.session_state.cast_active = False
+
+    _bc1, _bc2, _bc3 = st.columns([1, 1, 1])
     with _bc1:
         if st.button("⏹️ Stop", key="btn_stop_cast", help="Stop cast tracker"):
             st.session_state.cast_active = False
@@ -506,27 +523,6 @@ else:
             st.session_state.cast_phase_start_wall = _time.time()
             if len(st.session_state.cast_actual_trace) > 1:
                 st.session_state.cast_actual_trace.pop()
-            st.rerun()
-    with _bc4:
-        _np_label = "➡️ Next phase" if not _is_last_phase else "🏁 Complete"
-        _np_help  = f"Next: {_next_label}" if _next_label else None
-        if st.button(_np_label, key="btn_next_phase", type="primary",
-                     width='stretch', help=_np_help):
-            _elapsed_now = _time.time() - (st.session_state.cast_t0_wall or _time.time())
-            _live_t2_now = list(st.session_state.live_t2_depths)
-            _planned_depth = _cur_phase_early["depth_m"]
-            for _ti, _td in enumerate(t2_depths):
-                if abs(_planned_depth - _td) < 0.5 and _ti < len(_live_t2_now):
-                    _planned_depth = _live_t2_now[_ti]
-                    break
-            st.session_state.cast_actual_trace.append(
-                (_elapsed_now, _planned_depth, _cur_phase_early["label"])
-            )
-            if not _is_last_phase:
-                st.session_state.cast_phase_idx += 1
-                st.session_state.cast_phase_start_wall = _time.time()
-            else:
-                st.session_state.cast_active = False
             st.rerun()
 
     # ------------------------------------------------------------------
@@ -703,6 +699,42 @@ else:
 
         return _icon, _color, _req, _route_note, _dist, _ttp_travel, _t_at_V, _t_at_hard
 
+    def _t1_status(fs, elapsed_s, from_depth):
+        """
+        Returns (icon, color_hex, required_descent_speed, route_note, dist, ttp_travel, t_at_V, t_at_hard)
+        for a downcast (T1/D) station.
+        Colors: 🟢 reachable at V  🟡 need >V but possible  🔴 impossible  ⚫ timer already fired
+        """
+        _ttp = fs.preset_delay_s - elapsed_s
+        if _ttp <= 0:
+            return "⚫", "#212529", params.v_max, "—", 0, 0, elapsed_s, elapsed_s
+
+        _dist = max(fs.depth_m - from_depth, 0.0)
+        _route_note = f"↓{_dist:.0f}m"
+
+        if _dist < 0.5:
+            return "🔔", "#28a745", params.v_max, _route_note, _dist, _ttp, elapsed_s + _ttp, elapsed_s + _ttp
+
+        _t_at_V    = elapsed_s + _tt(_dist, params.v_max, params.accel)
+        _t_at_hard = elapsed_s + _tt(_dist, _V_HARD_MAX, params.accel)
+
+        _res = _rspeed(_dist, _ttp, params.accel)
+        if _res["status"] == "impossible":
+            _req = _V_HARD_MAX * 2
+        else:
+            _req = _res["v_required"]
+        _req = max(0.01, _req)
+
+        if _req <= params.v_max:
+            _icon, _color = "🟢", "#28a745"
+        elif _req <= _V_HARD_MAX:
+            _icon, _color = "🟡", "#f0ad4e"
+        else:
+            _icon, _color = "🔴", "#dc3545"
+
+        _req = min(_req, _V_HARD_MAX)
+        return _icon, _color, _req, _route_note, _dist, _ttp, _t_at_V, _t_at_hard
+
     _cast_elapsed_s  = _time.time() - (st.session_state.cast_t0_wall or _time.time())
 
     # Phase boundaries
@@ -724,35 +756,70 @@ else:
         _cast_depth      = _phase_to
         _cast_from_depth = _phase_from
 
-    # Step 2: T2 status with actual current depth
-    _t2_by_ascent = sorted(_live_t2_stops, key=lambda f: -f.depth_m)  # deepest first
+    # Step 2: station status — T1 (downcast) when pre-bottom, T2 (upcast) when post-bottom
+    _live_t1_stops = sorted([f for f in _live_stops if f.filter_type == 1],
+                             key=lambda f: f.preset_delay_s)
+    _t2_by_ascent  = sorted(_live_t2_stops, key=lambda f: -f.depth_m)  # deepest first
 
     # If the last T2 filter has already completed its full run, no more time constraint.
     _last_t2_dep = _t2_by_ascent[-1].departure_time_s if _t2_by_ascent else None
     _all_filters_done = (_last_t2_dep is not None and _cast_elapsed_s >= _last_t2_dep)
 
     _is_post_bottom = (_bottom_arrive_s is not None and _cast_elapsed_s >= _bottom_arrive_s)
-    if _all_filters_done:
-        _next_t2 = None
-    elif _is_post_bottom:
-        _next_t2 = next(
-            (fs for fs in _t2_by_ascent
-             if _cast_from_depth >= fs.depth_m and _cast_elapsed_s < fs.preset_delay_s),
-            None
-        )
-    else:
-        _next_t2 = _t2_by_ascent[0] if _t2_by_ascent else None
 
-    if _next_t2 is not None:
-        _t2_icon, _dot_marker_color, _t2_req_spd, *_ = _t2_status(
+    # Next pending D station (T1 — pre-bottom)
+    _next_t1 = next(
+        (fs for fs in _live_t1_stops if _cast_elapsed_s < fs.preset_delay_s), None
+    )
+
+    # Next pending U station (T2 — existing logic)
+    _next_t2 = None
+    if not _all_filters_done:
+        if _is_post_bottom:
+            _next_t2 = next(
+                (fs for fs in _t2_by_ascent
+                 if _cast_from_depth >= fs.depth_m and _cast_elapsed_s < fs.preset_delay_s),
+                None
+            )
+        else:
+            _next_t2 = _t2_by_ascent[0] if _t2_by_ascent else None
+
+    # Choose which station drives the dot marker color
+    if not _is_post_bottom and _next_t1 is not None:
+        _act_icon, _dot_marker_color, _act_req_spd, *_ = _t1_status(
+            _next_t1, _cast_elapsed_s, _cast_from_depth)
+        _active_station = _next_t1
+    elif _next_t2 is not None:
+        _act_icon, _dot_marker_color, _act_req_spd, *_ = _t2_status(
             _next_t2, _cast_elapsed_s, _cast_from_depth)
+        _active_station = _next_t2
     else:
-        _t2_icon, _dot_marker_color, _t2_req_spd = "✅", "#28a745", params.v_max
+        _act_icon, _dot_marker_color, _act_req_spd = "✅", "#28a745", params.v_max
+        _active_station = None
 
     # Step 3: Auto-record trace point every refresh (~2 s resolution)
     _trace = st.session_state.cast_actual_trace
     if not _trace or abs(_trace[-1][0] - _cast_elapsed_s) >= 1.9:
         _trace.append((_cast_elapsed_s, _cast_depth, ""))
+
+    # Step 4: Filtering-phase timing (absolute instrument preset, not phase-start-relative)
+    _is_filter_phase = "Filtering at" in _cur_phase["label"]
+    _cur_filter_stop = None
+    _filter_fires_in = None   # signed: positive = not fired yet, negative = already firing
+    _filter_ends_in  = None   # signed: time until departure_time_s
+    _arrival_offset  = None   # signed: negative = arrived early, positive = arrived late
+    if _is_filter_phase:
+        _cur_filter_stop = next(
+            (fs for fs in _live_stops
+             if abs(fs.preset_delay_s - _cur_phase["time_s"]) < 1.0),
+            None,
+        )
+        if _cur_filter_stop is not None:
+            _filter_fires_in = _cur_filter_stop.preset_delay_s - _cast_elapsed_s
+            _filter_ends_in  = _cur_filter_stop.departure_time_s - _cast_elapsed_s
+            if st.session_state.cast_phase_start_wall and st.session_state.cast_t0_wall:
+                _entry_elapsed  = st.session_state.cast_phase_start_wall - st.session_state.cast_t0_wall
+                _arrival_offset = _entry_elapsed - _cur_filter_stop.preset_delay_s
 
 
     # ---------------------------------------------------------------------------
@@ -760,6 +827,7 @@ else:
     # ---------------------------------------------------------------------------
     _sb_cast = fmt_time(_cast_elapsed_s)
     _sb_next = fmt_time(max(_next_phase["time_s"] - _cast_elapsed_s, 0)) if _next_phase else "—"
+    _sb_next_label = "🔬 Sampling ends in" if _is_filter_phase else "⏳ Next"
 
     # Next filter to fire — any filter (T1 or T2) whose preset hasn't fired yet
     _all_next_filters = sorted(
@@ -772,17 +840,6 @@ else:
         _sb_filt = f"{_next_any_filter.filter_id} starts in: <b>{fmt_time(_ttp_any)}</b>"
     else:
         _sb_filt = "All filters complete ✅"
-
-    _sb_btn_label = "➡️ Next phase" if not _is_last_phase else "🏁 Complete"
-    # Match the real Streamlit button by text content to avoid attribute-selector quoting issues
-    _js_click = (
-        "(function(){"
-        "var b=Array.from(window.parent.document.querySelectorAll('button')).find("
-        "function(el){var t=(el.innerText||el.textContent||'').trim();"
-        "return t.indexOf('Next phase')>=0||t.indexOf('Complete')>=0;});"
-        "if(b)b.click();"
-        "})()"
-    )
 
     st.markdown(
         f"""
@@ -808,18 +865,6 @@ else:
             gap: 20px;
             box-shadow: 0 2px 8px rgba(0,0,0,0.5);
         ">
-            <button onclick="{_js_click}" style="
-                background: #1565c0;
-                color: #fff;
-                border: none;
-                border-radius: 6px;
-                padding: 6px 16px;
-                font-size: 0.9rem;
-                font-weight: 700;
-                cursor: pointer;
-                white-space: nowrap;
-                flex-shrink: 0;
-            ">{_sb_btn_label}</button>
             <span style="color:#ffffff; font-size:0.95rem; font-weight:700; flex:1 1 auto; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
                 Phase {_pidx + 1}/{len(_phases)}&nbsp;&nbsp;{_cur_phase['label']}
             </span>
@@ -827,7 +872,7 @@ else:
                 ⏱️ T+&nbsp;<b>{_sb_cast}</b>
             </span>
             <span style="color:#8ec8f6; font-size:0.85rem; white-space:nowrap;">
-                ⏳ Next:&nbsp;<b>{_sb_next}</b>
+                {_sb_next_label}:&nbsp;<b>{_sb_next}</b>
             </span>
             <span style="color:#8ec8f6; font-size:0.85rem; white-space:nowrap;">
                 🎣 {_sb_filt}
@@ -861,36 +906,33 @@ else:
     _m_recovery.metric("🏁 Time to recovery", fmt_time(max(_live_total - _cast_elapsed_s, 0)))
 
     # ---------------------------------------------------------------------------
-    # Main status banner — driven entirely by T2 reachability, not phase clock.
-    # Early   = can reach next T2 at less than CTD speed → show min speed
-    # On time = reachable at exactly CTD speed
-    # Late    = need more than CTD speed but within winch limit → yellow
-    # Impossible = need more than winch limit → red
-    # Missed  = timer already fired for this station → black (already skipped in _next_t2)
-    # Done    = all filters complete
+    # Main status banner — driven by the next reachable sampling station.
+    # Pre-bottom: tracks next D (T1) station; post-bottom: tracks next U (T2) station.
     # ---------------------------------------------------------------------------
-    if _next_t2 is None:
+    if _active_station is None:
         _banner_color = "#28a745"
         _banner_text  = "✅ All filters complete — recovering"
-    elif _t2_icon == "🔔":
-        # At this T2 station, waiting for timer to fire
+    elif _act_icon == "🔔":
         _banner_color = "#28a745"
-        _banner_text  = (f"🔔 At {_next_t2.filter_id} ({_next_t2.depth_m:.0f} m) — "
-                         f"starts in {fmt_time(max(_next_t2.preset_delay_s - _cast_elapsed_s, 0))}")
-    elif _t2_icon == "🟢" and _t2_req_spd < params.v_max * 0.99:
+        _banner_text  = (f"🔔 At {_active_station.filter_id} ({_active_station.depth_m:.0f} m) — "
+                         f"starts in {fmt_time(max(_active_station.preset_delay_s - _cast_elapsed_s, 0))}")
+    elif _act_icon == "⚫":
+        _banner_color = "#212529"
+        _banner_text  = f"⚫ {_active_station.filter_id} — timer already fired (station missed)"
+    elif _act_icon == "🟢" and _act_req_spd < params.v_max * 0.99:
         _banner_color = "#28a745"
-        _banner_text  = (f"🟢 {_next_t2.filter_id} reachable — min speed: "
-                         f"{_t2_req_spd:.2f} m/s  (CTD speed: {params.v_max:.2f} m/s)")
-    elif _t2_icon == "🟢":
+        _banner_text  = (f"🟢 {_active_station.filter_id} reachable — min speed: "
+                         f"{_act_req_spd:.2f} m/s  (CTD speed: {params.v_max:.2f} m/s)")
+    elif _act_icon == "🟢":
         _banner_color = "#28a745"
-        _banner_text  = f"🟢 {_next_t2.filter_id} reachable at CTD speed ({params.v_max:.2f} m/s)"
-    elif _t2_icon == "🟡":
+        _banner_text  = f"🟢 {_active_station.filter_id} reachable at CTD speed ({params.v_max:.2f} m/s)"
+    elif _act_icon == "🟡":
         _banner_color = "#f0ad4e"
-        _banner_text  = (f"🟡 {_next_t2.filter_id} tight — need {_t2_req_spd:.2f} m/s "
+        _banner_text  = (f"🟡 {_active_station.filter_id} tight — need {_act_req_spd:.2f} m/s "
                          f"(CTD: {params.v_max:.2f} m/s, winch max: {v_hard_max:.2f} m/s)")
     else:  # 🔴
         _banner_color = "#dc3545"
-        _banner_text  = (f"🔴 {_next_t2.filter_id} unreachable — even winch max "
+        _banner_text  = (f"🔴 {_active_station.filter_id} unreachable — even winch max "
                          f"({v_hard_max:.2f} m/s) is not enough")
 
     st.markdown(
@@ -900,12 +942,66 @@ else:
         unsafe_allow_html=True,
     )
 
-    if _live_t2_stops:
-        st.markdown("**⚡ Speed needed to reach each T2 filter on time:**")
-        _t2_rows = []
-        for _fs in _live_t2_stops:
-            _icon, _color, _req_spd, _route_note, _dist, _ttp_travel, _t_at_V, _t_at_hard = \
-                _t2_status(_fs, _cast_elapsed_s, _cast_from_depth)
+    # Filtering-phase detail card — only shown when in a filtering phase
+    if _is_filter_phase and _cur_filter_stop is not None:
+        _filt_dur_s = _cur_filter_stop.departure_time_s - _cur_filter_stop.preset_delay_s
+        # Fire countdown: signed — positive = waiting to fire, negative = already firing
+        if _filter_fires_in is not None and _filter_fires_in > 0:
+            _fire_txt   = f"⏳ Fires in <b>{fmt_time(_filter_fires_in)}</b>"
+            _fire_color = "#4fa3e0"
+        elif _filter_fires_in is not None:
+            _fire_txt   = f"🔬 Sampling — started <b>{fmt_time(-_filter_fires_in)}</b> ago"
+            _fire_color = "#28a745"
+        else:
+            _fire_txt, _fire_color = "—", "#8ec8f6"
+        # Filter end countdown
+        if _filter_ends_in is not None and _filter_ends_in > 0:
+            _fend_txt = f"Ends in <b>{fmt_time(_filter_ends_in)}</b>"
+        elif _filter_ends_in is not None:
+            _fend_txt = "✅ Sampling complete"
+        else:
+            _fend_txt = "—"
+        # Arrival offset: how early/late the operator entered this phase vs. preset fire time
+        if _arrival_offset is not None:
+            if abs(_arrival_offset) < 5:
+                _arr_txt, _arr_color = "Arrived on time ✓", "#28a745"
+            elif _arrival_offset < 0:
+                _arr_txt  = f"🟢 Arrived <b>{fmt_time(-_arrival_offset)}</b> early"
+                _arr_color = "#28a745"
+            else:
+                _arr_txt  = f"🔴 Arrived <b>{fmt_time(_arrival_offset)}</b> late"
+                _arr_color = "#dc3545"
+        else:
+            _arr_txt, _arr_color = "—", "#8ec8f6"
+        st.markdown(
+            f'<div style="background:#0d1b2a; border:1.5px solid #4fa3e0; border-radius:8px; '
+            f'padding:8px 20px; margin:6px 0 10px 0; display:flex; gap:28px; '
+            f'align-items:center; flex-wrap:wrap;">'
+            f'<span style="color:#8ec8f6; font-size:0.85rem; white-space:nowrap;">'
+            f'🎣 <b>{_cur_filter_stop.filter_id}</b>'
+            f'&nbsp;|&nbsp;Preset: <b>{fmt_time(_cur_filter_stop.preset_delay_s)}</b>'
+            f'&nbsp;|&nbsp;Duration: <b>{fmt_time(_filt_dur_s)}</b></span>'
+            f'<span style="color:{_fire_color}; font-size:0.85rem; white-space:nowrap;">{_fire_txt}</span>'
+            f'<span style="color:#8ec8f6; font-size:0.85rem; white-space:nowrap;">{_fend_txt}</span>'
+            f'<span style="color:{_arr_color}; font-size:0.85rem; white-space:nowrap;">{_arr_txt}</span>'
+            f'</div>',
+            unsafe_allow_html=True,
+        )
+
+    _all_sampling_stops = sorted(
+        _live_t1_stops + _live_t2_stops,
+        key=lambda f: f.preset_delay_s,
+    )
+    if _all_sampling_stops:
+        st.markdown("**⚡ Speed needed to reach each sampling station on time:**")
+        _stn_rows = []
+        for _fs in _all_sampling_stops:
+            if _fs.filter_type == 1:
+                _icon, _color, _req_spd, _route_note, _dist, _ttp_travel, _t_at_V, _t_at_hard = \
+                    _t1_status(_fs, _cast_elapsed_s, _cast_from_depth)
+            else:
+                _icon, _color, _req_spd, _route_note, _dist, _ttp_travel, _t_at_V, _t_at_hard = \
+                    _t2_status(_fs, _cast_elapsed_s, _cast_from_depth)
             _ttp = _fs.preset_delay_s - _cast_elapsed_s
 
             if _ttp <= 0:
@@ -919,9 +1015,10 @@ else:
                 _early  = _fs.preset_delay_s - _t_at_V
                 _arr_str = f"+{fmt_time(_early)}" if _early >= 0 else f"−{fmt_time(-_early)}"
 
-            _t2_rows.append({
+            _stn_rows.append({
                 "": _icon,
-                "Filter": _fs.filter_id,
+                "Station": _fs.filter_id,
+                "Type": "Downcast (D)" if _fs.filter_type == 1 else "Upcast (U)",
                 "Depth (m)": f"{_fs.depth_m:.0f}",
                 "Route": _route_note,
                 "Min. speed": _v_str,
@@ -929,10 +1026,9 @@ else:
                 "Starts at (T+)": fmt_time(_fs.preset_delay_s),
                 "Countdown": fmt_time(max(_ttp, 0)),
             })
-
-        st.dataframe(pd.DataFrame(_t2_rows), width='stretch', hide_index=True)
+        st.dataframe(pd.DataFrame(_stn_rows), width='stretch', hide_index=True)
     else:
-        st.info("No Upcast filters configured.")
+        st.info("No sampling stations configured.")
 
 # ---------------------------------------------------------------------------
 # Depth-Time profile chart
@@ -1061,6 +1157,16 @@ fig.update_layout(
     hovermode="closest",
     uirevision="cast_plot",
 )
+
+if st.session_state.cast_active:
+    _np_label = "➡️ Next phase" if not _is_last_phase else "🏁 Complete"
+    _np_help = f"Next: {_next_label}" if _next_label else None
+    _np_left, _np_right = st.columns([4, 1])
+    with _np_right:
+        if st.button(_np_label, key="btn_next_phase", type="primary", width='stretch', help=_np_help):
+            _advance_current_phase()
+            st.rerun()
+
 st.plotly_chart(fig, width='stretch')
 
 # ---------------------------------------------------------------------------
