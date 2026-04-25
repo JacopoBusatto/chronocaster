@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#1a3a5c"/>
+      <stop offset="100%" stop-color="#0a1520"/>
+    </linearGradient>
+  </defs>
+  <!-- Background -->
+  <rect width="192" height="192" rx="28" fill="url(#bg)"/>
+
+  <!-- Anchor shaft -->
+  <line x1="96" y1="60" x2="96" y2="128" stroke="#4fa3e0" stroke-width="7" stroke-linecap="round"/>
+  <!-- Anchor crossbar -->
+  <line x1="68" y1="76" x2="124" y2="76" stroke="#4fa3e0" stroke-width="7" stroke-linecap="round"/>
+  <!-- Anchor ring at top -->
+  <circle cx="96" cy="52" r="10" fill="none" stroke="#4fa3e0" stroke-width="6"/>
+  <!-- Anchor flukes -->
+  <path d="M75 128 Q70 140 80 145 Q90 138 96 128" fill="none" stroke="#4fa3e0" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M117 128 Q122 140 112 145 Q102 138 96 128" fill="none" stroke="#4fa3e0" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- Clock face overlay on ring -->
+  <circle cx="96" cy="52" r="9" fill="#0d1b2a"/>
+  <line x1="96" y1="52" x2="96" y2="45" stroke="#8ec8f6" stroke-width="2.5" stroke-linecap="round"/>
+  <line x1="96" y1="52" x2="101" y2="56" stroke="#8ec8f6" stroke-width="2.5" stroke-linecap="round"/>
+  <circle cx="96" cy="52" r="2" fill="#4fa3e0"/>
+
+  <!-- Wave 1 -->
+  <path d="M18 162 Q33 151 48 162 Q63 173 78 162 Q93 151 108 162 Q123 173 138 162 Q153 151 174 162"
+        fill="none" stroke="#4fa3e0" stroke-width="5.5" stroke-linecap="round"/>
+  <!-- Wave 2 (faint) -->
+  <path d="M18 174 Q36 165 54 174 Q72 183 90 174 Q108 165 126 174 Q144 183 174 174"
+        fill="none" stroke="#4fa3e0" stroke-width="3.5" stroke-linecap="round" opacity="0.45"/>
+</svg>
