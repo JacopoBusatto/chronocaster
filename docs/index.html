@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>ChronoCaster</title>
+
+  <!-- PWA -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#4fa3e0">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="ChronoCaster">
+  <link rel="apple-touch-icon" href="icons/icon.svg">
+
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<!-- ================================================================ -->
+<!--  Header                                                           -->
+<!-- ================================================================ -->
+<header class="app-header">
+  <span class="header-logo">🌊 ChronoCaster</span>
+  <nav class="tab-nav">
+    <button class="tab-btn active" data-tab="planner">Planner</button>
+    <button class="tab-btn"        data-tab="tracker">Tracker</button>
+  </nav>
+</header>
+
+<!-- ================================================================ -->
+<!--  Main                                                             -->
+<!-- ================================================================ -->
+<main>
+
+  <!-- ============================================================== -->
+  <!--  PLANNER VIEW                                                   -->
+  <!-- ============================================================== -->
+  <div id="view-planner" class="view active">
+
+    <!-- Parameters panel -->
+    <div class="section">
+      <button class="section-header" data-collapse="params-content">
+        ⚙️ Cast Parameters <span class="section-chevron open">▼</span>
+      </button>
+      <div id="params-content" class="section-body">
+
+        <!-- Basic dynamics -->
+        <div class="form-row">
+          <label>Max cast depth (m)
+            <input type="number" id="inp-max-depth" min="1" max="6000" value="80">
+          </label>
+        </div>
+        <div class="form-row two-col">
+          <label>CTD speed (m/s)
+            <input type="number" id="inp-vmax" min="0.1" max="5.0" step="0.1" value="1.0">
+          </label>
+          <label>Acceleration (m/s²)
+            <input type="number" id="inp-accel" min="0.01" max="1.0" step="0.01" value="0.1">
+          </label>
+        </div>
+
+        <div class="divider"></div>
+
+        <!-- Downcast filters -->
+        <div class="filter-section-title">🔽 Downcast Filters</div>
+        <div id="t1-filters"></div>
+        <div class="filter-actions">
+          <button class="btn btn-outline btn-sm" id="add-t1">+ Add</button>
+          <button class="btn btn-danger btn-sm"  id="remove-t1">− Remove</button>
+        </div>
+
+        <div class="divider"></div>
+
+        <!-- Upcast filters -->
+        <div class="filter-section-title">🔼 Upcast Filters</div>
+        <div id="t2-filters"></div>
+        <div class="filter-actions">
+          <button class="btn btn-outline btn-sm" id="add-t2">+ Add</button>
+          <button class="btn btn-danger btn-sm"  id="remove-t2">− Remove</button>
+        </div>
+
+        <div class="divider"></div>
+
+        <!-- Advanced settings -->
+        <details id="advanced-settings">
+          <summary style="cursor:pointer; font-weight:600; font-size:0.88rem; color:var(--text-dim); padding:4px 0;">
+            🔬 Advanced Settings
+          </summary>
+          <div style="margin-top:10px">
+            <div class="form-row two-col">
+              <label>Deploy delay (MM:SS)
+                <input type="text" id="inp-deploy-delay" value="5:00" placeholder="5:00">
+              </label>
+              <label>Bottom dwell (MM:SS)
+                <input type="text" id="inp-bottom-dwell" value="0:30" placeholder="0:30">
+              </label>
+            </div>
+            <div class="form-row two-col">
+              <label>Homing time (MM:SS)
+                <input type="text" id="inp-homing-time" value="0:30" placeholder="0:30">
+              </label>
+              <label>Actuation buffer (MM:SS)
+                <input type="text" id="inp-actuation-buffer" value="0:10" placeholder="0:10">
+              </label>
+            </div>
+            <div class="form-row two-col">
+              <label>Max winch speed (m/s)
+                <input type="number" id="inp-vhard-max" min="0.1" max="5.0" step="0.1" value="1.7">
+              </label>
+              <div class="toggle-row">
+                <input type="checkbox" id="inp-clock-reset" checked>
+                <label for="inp-clock-reset" style="flex-direction:row; color:var(--text); font-size:0.84rem;">
+                  Clock resets after each filter
+                </label>
+              </div>
+            </div>
+          </div>
+        </details>
+
+      </div><!-- /params-content -->
+    </div><!-- /params panel -->
+
+    <!-- Results (built by app.js) -->
+    <div id="planner-results">
+      <div class="info-box" style="margin:10px;">
+        Add at least one filter above to compute preset delays.
+      </div>
+    </div>
+
+  </div><!-- /view-planner -->
+
+
+  <!-- ============================================================== -->
+  <!--  TRACKER VIEW (shell built by app.js on startCast)             -->
+  <!-- ============================================================== -->
+  <div id="view-tracker" class="view">
+    <div class="info-box" style="margin:20px 10px;">
+      No active cast. Go to the <strong>Planner</strong> tab, configure your cast,
+      and press <em>▶ Start Cast</em>.
+    </div>
+  </div>
+
+</main>
+
+<!-- ================================================================ -->
+<!--  Scripts (order matters: calculator → chart → app)               -->
+<!-- ================================================================ -->
+<script src="js/calculator.js"></script>
+<script src="js/chart.js"></script>
+<script src="js/app.js"></script>
+
+</body>
+</html>
