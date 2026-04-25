@@ -28,6 +28,53 @@ ChronoCaster currently includes two interfaces:
 
 ---
 
+
+## 📱 Use ChronoCaster on your phone (PWA)
+
+ChronoCaster is available as a mobile web app that you can install directly on your phone — no app store needed.
+
+### 🌐 Open the app
+
+Go to:
+
+https://JacopoBusatto.github.io/chronocaster/
+
+Open this link in your mobile browser.
+
+---
+
+### 📥 Install the app
+
+#### Android (Chrome)
+- Tap the menu (⋮)
+- Tap **Install app** or **Add to Home screen**
+
+#### iPhone (Safari)
+- Tap the **Share** button
+- Tap **Add to Home Screen**
+
+Once installed, the app will appear like a normal app on your phone.
+
+---
+
+### 🔌 Use it offline
+
+The app works offline after the first load.
+
+1. Open the app once while connected to the internet  
+2. Close it  
+3. You can now reopen it without Wi-Fi or mobile data  
+
+---
+
+### ⚠️ Important notes
+
+- You must open the app **once online** before using it offline  
+- If the app is updated, you need to open it online again to get the latest version  
+- Offline mode stores data locally on your device
+
+---
+
 ## Features
 
 ### Pre-cast planner
@@ -106,53 +153,6 @@ streamlit run app.py
 ```
 
 Then open the URL shown in the terminal (usually `http://localhost:8501`).
-
-
-## 📱 Use ChronoCaster on your phone (PWA)
-
-ChronoCaster is available as a mobile web app that you can install directly on your phone — no app store needed.
-
-### 🌐 Open the app
-
-Go to:
-
-https://JacopoBusatto.github.io/chronocaster/
-
-Open this link in your mobile browser.
-
----
-
-### 📥 Install the app
-
-#### Android (Chrome)
-- Tap the menu (⋮)
-- Tap **Install app** or **Add to Home screen**
-
-#### iPhone (Safari)
-- Tap the **Share** button
-- Tap **Add to Home Screen**
-
-Once installed, the app will appear like a normal app on your phone.
-
----
-
-### 🔌 Use it offline
-
-The app works offline after the first load.
-
-1. Open the app once while connected to the internet  
-2. Close it  
-3. You can now reopen it without Wi-Fi or mobile data  
-
----
-
-### ⚠️ Important notes
-
-- You must open the app **once online** before using it offline  
-- If the app is updated, you need to open it online again to get the latest version  
-- Offline mode stores data locally on your device  
-
----
 
 ### 🚀 What you can do
 
