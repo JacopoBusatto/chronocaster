@@ -107,27 +107,68 @@ streamlit run app.py
 
 Then open the URL shown in the terminal (usually `http://localhost:8501`).
 
-### PWA version
 
-1. Start a static server from the repository root:
+## 📱 Use ChronoCaster on your phone (PWA)
 
-```bash
-python -m http.server 8000 -d pwa
-```
+ChronoCaster is available as a mobile web app that you can install directly on your phone — no app store needed.
 
-2. Open the PWA in a browser:
+### 🌐 Open the app
 
-```text
-http://127.0.0.1:8000/index.html
-```
+Go to:
 
-3. Install it:
-- **Android / Chrome**: open the browser menu and choose **Install app** or **Add to Home screen**
-- **iPhone / Safari**: tap **Share** then **Add to Home Screen**
+https://JacopoBusatto.github.io/chronocaster/
 
-4. Open the installed app once while online so the service worker caches the assets.
+Open this link in your mobile browser.
 
-5. After that first successful load, the app is designed to keep working offline.
+---
+
+### 📥 Install the app
+
+#### Android (Chrome)
+- Tap the menu (⋮)
+- Tap **Install app** or **Add to Home screen**
+
+#### iPhone (Safari)
+- Tap the **Share** button
+- Tap **Add to Home Screen**
+
+Once installed, the app will appear like a normal app on your phone.
+
+---
+
+### 🔌 Use it offline
+
+The app works offline after the first load.
+
+1. Open the app once while connected to the internet  
+2. Close it  
+3. You can now reopen it without Wi-Fi or mobile data  
+
+---
+
+### ⚠️ Important notes
+
+- You must open the app **once online** before using it offline  
+- If the app is updated, you need to open it online again to get the latest version  
+- Offline mode stores data locally on your device  
+
+---
+
+### 🚀 What you can do
+
+- Plan CTD casts and compute instrument trigger delays  
+- Visualize the depth–time profile  
+- Track the cast live during operations  
+- Use it directly onboard, even without internet connection  
+
+---
+
+### 🧪 Troubleshooting
+
+- If the app does not install:
+  - Make sure you are using Chrome (Android) or Safari (iPhone)
+- If offline mode does not work:
+  - Open the app again while online to refresh the cache
 
 ### Cast parameters (sidebar)
 
