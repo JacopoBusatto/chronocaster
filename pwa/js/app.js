@@ -578,6 +578,11 @@ function renderPlannerResults() {
 }
 
 function buildWaypoints(filterStops, timeline) {
+  return buildWaypointsFromStops(filterStops);
+}
+
+/** Build chart waypoints from any set of filter stops (planned or live). */
+function buildWaypointsFromStops(filterStops) {
   const wps = [];
   const t1Stops = filterStops.filter(f => f.filterType === 1);
   const t2Stops = filterStops.filter(f => f.filterType === 2);
@@ -638,6 +643,8 @@ function stopCast() {
   S.t0WallMs   = null;
   clearInterval(S.clockIntervalId);
   S.clockIntervalId = null;
+  const floatBtn = q('#float-next-btn');
+  if (floatBtn) floatBtn.classList.add('hidden');
   switchView('planner');
 }
 
@@ -679,7 +686,6 @@ function renderTrackerShell() {
     <div id="tracker-controls" style="padding:10px; display:flex; gap:8px; flex-wrap:wrap;">
       <button class="btn btn-danger btn-sm" id="btn-stop-cast">⏹ Stop</button>
       <button class="btn btn-outline btn-sm" id="btn-undo-phase" disabled>↩ Undo</button>
-      <button class="btn btn-primary" id="btn-next-phase" style="margin-left:auto; min-width:120px;">➡ Next Phase</button>
     </div>
 
     <!-- T2 depth corrections -->
@@ -719,7 +725,18 @@ function renderTrackerShell() {
   // Wire up controls
   q('#btn-stop-cast').addEventListener('click', () => { if (confirm('Stop cast?')) stopCast(); });
   q('#btn-undo-phase').addEventListener('click', undoPhase);
-  q('#btn-next-phase').addEventListener('click', nextPhase);
+
+  // Floating next-phase button (persists across updateTrackerDisplay calls)
+  let floatBtn = q('#float-next-btn');
+  if (!floatBtn) {
+    floatBtn = document.createElement('button');
+    floatBtn.id = 'float-next-btn';
+    floatBtn.className = 'btn btn-primary float-next-btn';
+    floatBtn.textContent = '➡ Next Phase';
+    document.body.appendChild(floatBtn);
+  }
+  floatBtn.classList.remove('hidden');
+  floatBtn.addEventListener('click', nextPhase);
 
   // T2 live depth inputs
   el.addEventListener('change', e => {
@@ -822,10 +839,10 @@ function updateTrackerDisplay() {
     `;
   }
 
-  // ---- Next-phase button label ----
-  const nextBtn = q('#btn-next-phase');
-  if (nextBtn) {
-    nextBtn.textContent = isLastPhase ? '🏁 Complete' : '➡ Next Phase';
+  // ---- Floating Next Phase button label ----
+  const floatBtn = q('#float-next-btn');
+  if (floatBtn) {
+    floatBtn.textContent = isLastPhase ? '🏁 Complete' : '➡ Next Phase';
   }
   const undoBtn = q('#btn-undo-phase');
   if (undoBtn) undoBtn.disabled = S.phaseIdx === 0;
@@ -955,8 +972,8 @@ function updateTrackerDisplay() {
     <div class="phase-breadcrumb">${breadcrumb}</div>
   `;
 
-  // Redraw chart
-  const waypoints = buildWaypoints(S.filterStops, S.timeline);
+  // Redraw chart — use liveStops so corrected T2 depths update the planned path line
+  const waypoints = buildWaypointsFromStops(liveStops);
   const liveT2 = liveStops.filter(f => f.filterType === 2);
   requestAnimationFrame(() => {
     drawChart('tracker-chart', {

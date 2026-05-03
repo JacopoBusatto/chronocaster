@@ -41,10 +41,15 @@ function drawChart(canvasId, data) {
   const CH = Math.max(H - MT - MB, 10);
 
   const xMax = (totalTimeS || 600) * 1.05;
-  const yMax = (maxDepthM  || 100) * 1.12;
+  // Add 8% padding above the surface so the 0 m line sits inside the chart area,
+  // leaving room for surface markers, dots, and labels.
+  const yPad = (maxDepthM || 100) * 0.08;
+  const yMin = -yPad;
+  const yMax = (maxDepthM  || 100) * 1.08;
+  const yRange = yMax - yMin;
 
-  const sx = t => ML + (t / xMax) * CW;       // seconds  → pixel X
-  const sy = d => MT + (d / yMax) * CH;        // metres   → pixel Y (0 = top)
+  const sx = t => ML + (t / xMax) * CW;                         // seconds → pixel X
+  const sy = d => MT + ((d - yMin) / yRange) * CH;              // metres  → pixel Y (0 is ~8% from top)
 
   // ---------- Background ----------
   ctx.fillStyle = '#0d1b2a';
@@ -54,9 +59,9 @@ function drawChart(canvasId, data) {
   ctx.save();
   ctx.font = `${10}px monospace`;
 
-  // Y-axis grid  (depth)
+  // Y-axis grid  (depth) — iterate over the visible range (yMin → yMax)
   const yStep = niceStep(yMax, 7);
-  for (let d = 0; d <= yMax + yStep * 0.01; d += yStep) {
+  for (let d = Math.ceil(yMin / yStep) * yStep; d <= yMax + yStep * 0.01; d += yStep) {
     const y = sy(d);
     if (y < MT || y > MT + CH + 1) continue;
     ctx.strokeStyle = '#1e3a5f';

@@ -386,6 +386,24 @@ tbody tr:nth-child(even) { background: var(--bg3); }
   margin: 10px 0;
 }
 
+/* ---------- Floating Next Phase button ---------- */
+.float-next-btn {
+  position: fixed;
+  bottom: 24px;
+  right: 16px;
+  z-index: 500;
+  min-width: 52px;
+  min-height: 52px;
+  border-radius: 28px;
+  font-size: 0.9rem;
+  font-weight: 700;
+  padding: 0 20px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+  transition: transform 0.1s;
+}
+.float-next-btn:active { transform: scale(0.93); }
+.float-next-btn.hidden { display: none !important; }
+
 /* ---------- toast ---------- */
 .toast {
   position: fixed;
