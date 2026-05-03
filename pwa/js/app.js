@@ -581,11 +581,51 @@ function buildWaypoints(filterStops, timeline) {
   return buildWaypointsFromStops(filterStops);
 }
 
+function getWaypointsMilestones(filterStops) {
+  const t1Stops = filterStops
+    .filter(f => f.filterType === 1)
+    .sort((a, b) => a.arrivalTimeS - b.arrivalTimeS);
+  const t2Stops = filterStops
+    .filter(f => f.filterType === 2)
+    .sort((a, b) => a.arrivalTimeS - b.arrivalTimeS);
+
+  let currentDepth = 0;
+  let currentTime = S.deployDelayS;
+  let surfaceReturnS = null;
+
+  if (t1Stops.length > 0) {
+    const lastT1 = t1Stops[t1Stops.length - 1];
+    currentDepth = lastT1.depthM;
+    currentTime = lastT1.departureTimeS;
+    currentTime += travelTime(currentDepth, S.vMax, S.accel);
+    currentDepth = 0;
+    surfaceReturnS = currentTime;
+  }
+
+  currentTime += travelTime(Math.abs(S.maxDepthM - currentDepth), S.vMax, S.accel);
+  const bottomArriveS = currentTime;
+  const bottomLeaveS = bottomArriveS + S.bottomDwellS;
+
+  currentDepth = S.maxDepthM;
+  currentTime = bottomLeaveS;
+
+  if (t2Stops.length > 0) {
+    const lastT2 = t2Stops[t2Stops.length - 1];
+    currentDepth = lastT2.depthM;
+    currentTime = lastT2.departureTimeS;
+  }
+
+  const recoveredTimeS = currentTime + travelTime(currentDepth, S.vMax, S.accel);
+
+  return { surfaceReturnS, bottomArriveS, bottomLeaveS, recoveredTimeS };
+}
+
 /** Build chart waypoints from any set of filter stops (planned or live). */
 function buildWaypointsFromStops(filterStops) {
   const wps = [];
   const t1Stops = filterStops.filter(f => f.filterType === 1);
   const t2Stops = filterStops.filter(f => f.filterType === 2);
+  const milestones = getWaypointsMilestones(filterStops);
 
   wps.push({ timeS: 0, depthM: 0, label: 'Deploy' });
   if (S.deployDelayS > 0)
@@ -597,12 +637,12 @@ function buildWaypointsFromStops(filterStops) {
     wps.push({ timeS: fs.departureTimeS, depthM: fs.depthM, label: `${fs.filterId} end` });
   });
 
-  if (S.surfaceReturnS !== null)
-    wps.push({ timeS: S.surfaceReturnS, depthM: 0, label: 'Surface return' });
+  if (milestones.surfaceReturnS !== null)
+    wps.push({ timeS: milestones.surfaceReturnS, depthM: 0, label: 'Surface return' });
 
-  if (S.bottomArriveS !== null) {
-    wps.push({ timeS: S.bottomArriveS, depthM: S.maxDepthM, label: 'Bottom' });
-    wps.push({ timeS: S.bottomLeaveS,  depthM: S.maxDepthM, label: 'Leave bottom' });
+  if (milestones.bottomArriveS !== null) {
+    wps.push({ timeS: milestones.bottomArriveS, depthM: S.maxDepthM, label: 'Bottom' });
+    wps.push({ timeS: milestones.bottomLeaveS,  depthM: S.maxDepthM, label: 'Leave bottom' });
   }
 
   t2Stops.forEach(fs => {
@@ -611,8 +651,8 @@ function buildWaypointsFromStops(filterStops) {
     wps.push({ timeS: fs.departureTimeS, depthM: fs.depthM, label: `${fs.filterId} end` });
   });
 
-  if (S.recoveredTimeS)
-    wps.push({ timeS: S.recoveredTimeS, depthM: 0, label: 'Recovered' });
+  if (milestones.recoveredTimeS !== null)
+    wps.push({ timeS: milestones.recoveredTimeS, depthM: 0, label: 'Recovered' });
 
   wps.sort((a, b) => a.timeS - b.timeS);
   return wps;
