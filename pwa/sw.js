@@ -1,8 +1,8 @@
 /* Service Worker — ChronoCaster PWA
-   Cache-first strategy for full offline support.
-   Bump CACHE_NAME to force an update push to all clients.
+  Cache-first strategy for full offline support.
+  Bump CACHE_NAME to force an update push to all clients.
 */
-const CACHE_NAME = 'chronocaster-v1';
+const CACHE_NAME = 'chronocaster-v2';
 
 const ASSETS = [
   './',
