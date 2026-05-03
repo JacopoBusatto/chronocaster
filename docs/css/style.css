@@ -143,6 +143,7 @@ input[type="text"] {
   outline: none;
   transition: border-color 0.15s;
   -webkit-appearance: none;
+  appearance: none;
 }
 input[type="number"]:focus,
 input[type="text"]:focus { border-color: var(--blue); }

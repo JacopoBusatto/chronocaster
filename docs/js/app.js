@@ -919,13 +919,10 @@ function updateTrackerDisplay() {
       vStr   = `${st.icon} ${st.reqSpd.toFixed(2)} m/s`;
       arrStr = earlyS >= 0 ? `+${fmtTime(earlyS)}` : `−${fmtTime(-earlyS)}`;
     }
-    const typeLabel = fs.filterType === 1 ? 'Downcast (D)' : 'Upcast (U)';
     const idClass   = fs.filterType === 1 ? 'td-d' : 'td-u';
     return `<tr>
       <td class="${idClass} bold">${fs.filterId}</td>
-      <td class="text-dim">${typeLabel}</td>
       <td>${fs.depthM.toFixed(0)} m</td>
-      <td>${st.routeNote}</td>
       <td class="mono">${vStr}</td>
       <td class="mono">${arrStr !== '—' ? arrStr : '—'}</td>
       <td class="mono">${fmtTime(Math.max(ttp, 0))}</td>
@@ -941,8 +938,11 @@ function updateTrackerDisplay() {
     return `<span class="phase-future">○ ${ph.label}</span>`;
   }).join(' › ');
 
-  // Inject live section
-  q('#tracker-live').innerHTML = `
+  // Inject live section — save scroll positions of scrollable children before rebuilding
+  const _liveEl = q('#tracker-live');
+  const _tableScrollLeft = _liveEl.querySelector('.preset-table-wrapper')?.scrollLeft ?? 0;
+  const _breadcrumbScrollLeft = _liveEl.querySelector('.phase-breadcrumb')?.scrollLeft ?? 0;
+  _liveEl.innerHTML = `
     <div class="status-banner ${bannerClass}" style="margin:6px 10px">${bannerText}</div>
 
     ${filterCardHtml}
@@ -962,15 +962,19 @@ function updateTrackerDisplay() {
     <div class="preset-table-wrapper" style="margin:0 10px 10px">
       <table>
         <thead><tr>
-          <th>Station</th><th>Type</th><th>Depth</th>
-          <th>Route</th><th>Min. speed</th><th>Arrival @V</th><th>Countdown</th>
+          <th>Station</th><th>Depth</th>
+          <th>Min. speed</th><th>Arrival @V</th><th>Countdown</th>
         </tr></thead>
-        <tbody>${speedRows || '<tr><td colspan="7" class="text-dim" style="text-align:center;padding:10px">No stations configured</td></tr>'}</tbody>
+        <tbody>${speedRows || '<tr><td colspan="5" class="text-dim" style="text-align:center;padding:10px">No stations configured</td></tr>'}</tbody>
       </table>
     </div>
 
     <div class="phase-breadcrumb">${breadcrumb}</div>
   `;
+
+  // Restore scroll positions after DOM rebuild
+  _liveEl.querySelector('.preset-table-wrapper')?.scrollTo({ left: _tableScrollLeft, behavior: 'instant' });
+  _liveEl.querySelector('.phase-breadcrumb')?.scrollTo({ left: _breadcrumbScrollLeft, behavior: 'instant' });
 
   // Redraw chart — use liveStops so corrected T2 depths update the planned path line
   const waypoints = buildWaypointsFromStops(liveStops);

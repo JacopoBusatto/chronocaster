@@ -41,9 +41,9 @@ function drawChart(canvasId, data) {
   const CH = Math.max(H - MT - MB, 10);
 
   const xMax = (totalTimeS || 600) * 1.05;
-  // Add 8% padding above the surface so the 0 m line sits inside the chart area,
-  // leaving room for surface markers, dots, and labels.
-  const yPad = (maxDepthM || 100) * 0.08;
+  // Add 15% padding above the surface so the 0 m line sits well inside the chart
+  // area, leaving enough room for surface markers, dots, and labels.
+  const yPad = (maxDepthM || 100) * 0.15;
   const yMin = -yPad;
   const yMax = (maxDepthM  || 100) * 1.08;
   const yRange = yMax - yMin;
