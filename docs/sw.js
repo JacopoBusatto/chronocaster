@@ -2,7 +2,7 @@
   Cache-first strategy for full offline support.
   Bump CACHE_NAME to force an update push to all clients.
 */
-const CACHE_NAME = 'chronocaster-v2';
+const CACHE_NAME = 'chronocaster-v3';
 
 const ASSETS = [
   './',

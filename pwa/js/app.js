@@ -132,6 +132,7 @@ function recompute() {
 function buildPhases(filterStops) {
   const t1 = filterStops.filter(f => f.filterType === 1);
   const t2 = filterStops.filter(f => f.filterType === 2);
+  const milestones = getWaypointsMilestones(filterStops);
   const ph = [];
 
   let prevDepart = S.deployDelayS;
@@ -152,19 +153,19 @@ function buildPhases(filterStops) {
     prevDepth  = fs.depthM;
   });
 
-  if (t1.length > 0 && S.surfaceReturnS !== null) {
+  if (t1.length > 0 && milestones.surfaceReturnS !== null) {
     ph.push({ label: '🔼 Returning to surface',
                timeS: prevDepart, depthM: 0, fromDepthM: prevDepth });
-    prevDepart = S.surfaceReturnS;
+    prevDepart = milestones.surfaceReturnS;
     prevDepth  = 0;
   }
 
-  if (S.bottomArriveS !== null) {
+  if (milestones.bottomArriveS !== null) {
     ph.push({ label: `🔽 Descending to bottom (${S.maxDepthM.toFixed(0)} m)`,
                timeS: prevDepart, depthM: S.maxDepthM, fromDepthM: prevDepth });
     ph.push({ label: '⚓ At bottom',
-               timeS: S.bottomArriveS, depthM: S.maxDepthM, fromDepthM: S.maxDepthM });
-    prevDepart = S.bottomLeaveS;
+               timeS: milestones.bottomArriveS, depthM: S.maxDepthM, fromDepthM: S.maxDepthM });
+    prevDepart = milestones.bottomLeaveS;
     prevDepth  = S.maxDepthM;
   }
 
@@ -181,7 +182,7 @@ function buildPhases(filterStops) {
     prevDepth  = fs.depthM;
   });
 
-  if (S.recoveredTimeS !== null) {
+  if (milestones.recoveredTimeS !== null) {
     ph.push({ label: '🔼 Recovering to deck', timeS: prevDepart, depthM: 0, fromDepthM: prevDepth });
   }
   return ph;
@@ -245,8 +246,8 @@ function getElapsedS() {
 }
 
 // ---- Estimated current depth ----
-function getCurrentDepth(elapsedS) {
-  const phase = S.phases[S.phaseIdx];
+function getCurrentDepth(elapsedS, phases = S.phases) {
+  const phase = phases[S.phaseIdx];
   if (!phase) return 0;
   const from = phase.fromDepthM, to = phase.depthM;
   if (Math.abs(to - from) < 0.5) return to;
@@ -261,10 +262,10 @@ function getCurrentDepth(elapsedS) {
 // =====================================================================
 // STATION STATUS CALCULATION
 // =====================================================================
-function stationStatus(fs, elapsedS, fromDepth) {
+function stationStatus(fs, elapsedS, fromDepth, bottomArriveS = S.bottomArriveS) {
   return fs.filterType === 1
     ? calcT1Status(fs, elapsedS, fromDepth)
-    : calcT2Status(fs, elapsedS, fromDepth);
+    : calcT2Status(fs, elapsedS, fromDepth, bottomArriveS);
 }
 
 function calcT1Status(fs, elapsedS, fromDepth) {
@@ -284,9 +285,9 @@ function calcT1Status(fs, elapsedS, fromDepth) {
   return { icon, color, reqSpd: Math.min(req, S.vHardMax), routeNote, dist, tAtV, tAtHard };
 }
 
-function calcT2Status(fs, elapsedS, fromDepth) {
+function calcT2Status(fs, elapsedS, fromDepth, bottomArriveS = S.bottomArriveS) {
   const ttp   = fs.presetDelayS - elapsedS;
-  const preBot = S.bottomArriveS !== null && elapsedS < S.bottomArriveS;
+  const preBot = bottomArriveS !== null && elapsedS < bottomArriveS;
   if (ttp <= 0) return { icon: '⚫', color: '#6c757d', reqSpd: S.vMax, routeNote: '—', dist: 0, tAtV: elapsedS };
 
   let dist, routeNote, tAtV, tAtHard, ttpTravel;
@@ -670,7 +671,7 @@ function startCast() {
   S.phaseIdx          = 0;
   S.actualTrace       = [{ elapsedS: 0, depthM: 0, label: 'T=0 — cast started' }];
   S.liveT2Depths      = S.t2Filters.map(f => f.depthM);
-  S.phases            = buildPhases(S.filterStops);
+  S.phases            = buildPhases(getLiveFilterStops());
   S.phases.forEach(ph => { if (ph.timeS === undefined) ph.timeS = 0; });
 
   switchView('tracker');
@@ -689,6 +690,8 @@ function stopCast() {
 }
 
 function nextPhase() {
+  S.phases = buildPhases(getLiveFilterStops());
+  if (S.phaseIdx >= S.phases.length) S.phaseIdx = Math.max(S.phases.length - 1, 0);
   const elapsedS    = getElapsedS();
   const curPhase    = S.phases[S.phaseIdx];
   const curDepth    = curPhase ? curPhase.depthM : 0;
@@ -793,22 +796,27 @@ function updateTrackerDisplay() {
   if (!document.getElementById('tracker-live')) return;
 
   const elapsedS    = getElapsedS();
-  const curPhase    = S.phases[Math.min(S.phaseIdx, S.phases.length - 1)];
-  const nextPhaseEv = S.phases[S.phaseIdx + 1];
-  const isLastPhase = S.phaseIdx >= S.phases.length - 1;
+  const liveStops = getLiveFilterStops();
+  const liveMilestones = getWaypointsMilestones(liveStops);
+  S.phases = buildPhases(liveStops);
+  if (S.phaseIdx >= S.phases.length) S.phaseIdx = Math.max(S.phases.length - 1, 0);
+
+  const phases      = S.phases;
+  const curPhase    = phases[Math.min(S.phaseIdx, phases.length - 1)];
+  const nextPhaseEv = phases[S.phaseIdx + 1];
+  const isLastPhase = S.phaseIdx >= phases.length - 1;
 
   // Current depth estimate
   const fromDepth = curPhase ? curPhase.fromDepthM : 0;
-  const curDepth  = getCurrentDepth(elapsedS);
+  const curDepth  = getCurrentDepth(elapsedS, phases);
 
   // Live filter stops (with T2 corrections + actual preset overrides)
-  const liveStops = getLiveFilterStops();
   const t1Live = liveStops.filter(f => f.filterType === 1).sort((a, b) => a.presetDelayS - b.presetDelayS);
   const t2Live = liveStops.filter(f => f.filterType === 2).sort((a, b) => -b.arrivalTimeS + a.arrivalTimeS);
   // t2 deepest first for pre-bottom, shallowest-next for post-bottom
   const t2ByAscent = [...liveStops.filter(f => f.filterType === 2)].sort((a, b) => b.depthM - a.depthM);
 
-  const isPostBottom = S.bottomArriveS !== null && elapsedS >= S.bottomArriveS;
+  const isPostBottom = liveMilestones.bottomArriveS !== null && elapsedS >= liveMilestones.bottomArriveS;
 
   // Auto-record trace every ~2s
   const tr = S.actualTrace;
@@ -871,7 +879,7 @@ function updateTrackerDisplay() {
 
     stickyBar.innerHTML = `
       <span class="sticky-phase">
-        Phase ${S.phaseIdx + 1}/${S.phases.length} — ${label}
+        Phase ${S.phaseIdx + 1}/${phases.length} — ${label}
       </span>
       <span class="sticky-stat">⏱ T+ <b>${fmtTime(elapsedS)}</b></span>
       <span class="sticky-stat">${nextLabel}: <b>${nextVal}</b></span>
@@ -893,7 +901,7 @@ function updateTrackerDisplay() {
     bannerText = '✅ All filters complete — recovering';
     bannerClass = 'banner-green';
   } else {
-    const st = stationStatus(activeStation, elapsedS, curDepth);
+    const st = stationStatus(activeStation, elapsedS, curDepth, liveMilestones.bottomArriveS);
     if (st.icon === '⚫') {
       bannerClass = 'banner-dark';
       bannerText  = `⚫ ${activeStation.filterId} — timer already fired (station missed)`;
@@ -949,7 +957,7 @@ function updateTrackerDisplay() {
   // ---- Speed table ----
   const allStops = [...t1Live, ...t2Live].sort((a, b) => a.presetDelayS - b.presetDelayS);
   const speedRows = allStops.map(fs => {
-    const st  = stationStatus(fs, elapsedS, curDepth);
+    const st  = stationStatus(fs, elapsedS, curDepth, liveMilestones.bottomArriveS);
     const ttp = fs.presetDelayS - elapsedS;
     const earlyS = fs.presetDelayS - st.tAtV;
     let vStr, arrStr;
@@ -969,10 +977,11 @@ function updateTrackerDisplay() {
     </tr>`;
   }).join('');
 
-  const recoveryLeft = Math.max(S.totalCastTimeS - elapsedS, 0);
+  const liveTotalTimeS = liveMilestones.recoveredTimeS || S.totalCastTimeS;
+  const recoveryLeft = Math.max(liveTotalTimeS - elapsedS, 0);
 
   // ---- Phase breadcrumb ----
-  const breadcrumb = S.phases.map((ph, i) => {
+  const breadcrumb = phases.map((ph, i) => {
     if (i < S.phaseIdx)      return `<span class="phase-done">${ph.label}</span>`;
     if (i === S.phaseIdx)    return `<span class="phase-active">● ${ph.label}</span>`;
     return `<span class="phase-future">○ ${ph.label}</span>`;
@@ -1027,7 +1036,7 @@ function updateTrackerDisplay() {
       actualTrace: S.actualTrace,
       currentPos: S.castActive ? { elapsedS, depthM: curDepth, color: dotColor } : null,
       maxDepthM: S.maxDepthM,
-      totalTimeS: S.totalCastTimeS,
+      totalTimeS: liveTotalTimeS,
     });
   });
 }
